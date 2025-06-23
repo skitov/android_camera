@@ -1,6 +1,9 @@
     package com.example.campreview
 
+import android.Manifest
+import android.app.Activity
 import android.content.Context
+import android.content.pm.PackageManager
 import android.os.Bundle
 import android.util.Log
 import android.util.Rational
@@ -32,12 +35,26 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.LifecycleOwner
+import android.content.res.Resources
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.material3.Button
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.platform.LocalContext
+import androidx.core.app.ActivityCompat
 import com.example.campreview.ui.theme.MyApplicationTheme
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+//        setContentView(R.layout.activity_main)
+//        val previewView = findViewById<PreviewView>(R.id.previewView)
+//        val screenWidth = Resources.getSystem().displayMetrics.widthPixels
+//        val layoutParams = previewView.layoutParams
+//        layoutParams.height = screenWidth / 3 // 3:1 ratio
+//        previewView.layoutParams = layoutParams
         setContent {
             MyApplicationTheme {
                 Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
@@ -53,7 +70,7 @@ class MainActivity : ComponentActivity() {
     @Composable
     fun CameraPreview()
     {
-        val previewH = (LocalConfiguration.current.screenWidthDp/3).dp
+        val previewH = (LocalConfiguration.current.screenWidthDp).dp
         fun startCamera(context: Context,
                         previewView: PreviewView) {
             val cameraProviderFuture = ProcessCameraProvider.getInstance(context)
@@ -74,7 +91,7 @@ class MainActivity : ComponentActivity() {
                     // Unbind all use cases before rebinding
                     cameraProvider.unbindAll()
 
-                    val viewPort = ViewPort.Builder(Rational(3,1), Surface.ROTATION_0).
+                    val viewPort = ViewPort.Builder(Rational(1,1), Surface.ROTATION_0).
                     setScaleType(ViewPort.FILL_CENTER).build()
                     val useGrp = UseCaseGroup.Builder().
                     addUseCase(preview).
@@ -98,10 +115,12 @@ class MainActivity : ComponentActivity() {
                     }
                 ,
                 factory = { context ->
+                    val screenWidth = Resources.getSystem().displayMetrics.widthPixels
                     val previewView = PreviewView(context).apply {
+                        scaleType = PreviewView.ScaleType.FILL_CENTER
                         layoutParams = ViewGroup.LayoutParams(
-                            ViewGroup.LayoutParams.MATCH_PARENT,
-                            ViewGroup.LayoutParams.MATCH_PARENT
+                            screenWidth,
+                            screenWidth
                         )
                     }
                     //focusFactory = previewView.meteringPointFactory
@@ -115,12 +134,42 @@ class MainActivity : ComponentActivity() {
     @Composable
     fun Content(modifier: Modifier = Modifier)
     {
-        Column(modifier = modifier)
+        val ctx = LocalContext.current
+        val needPermission = remember {
+            mutableStateOf(ContextCompat.checkSelfPermission(ctx, Manifest.permission.CAMERA) !=
+                    PackageManager.PERMISSION_GRANTED)}
+        val CAMERA_PERMISSION_REQUEST_CODE = 101
+        @Composable
+        fun PermissionRequestUI() {
+            Column(
+                modifier = Modifier.fillMaxSize(),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.Center
+            ) {
+                Text("Camera permission is required to use this feature.")
+                Button(onClick = { ActivityCompat.requestPermissions(
+                    ctx as Activity,
+                    arrayOf(Manifest.permission.CAMERA),
+                    CAMERA_PERMISSION_REQUEST_CODE
+                )
+                    needPermission.value = false}) {
+                    Text("Grant Permission")
+                }
+            }
+        }
+
+        if(needPermission.value)
         {
-            CameraPreview()
-            Text("ABYR")
-            Text("VALG")
-            Text("qwert")
-            Text("zxcv")
+            PermissionRequestUI()
+        }
+        else {
+            Column(modifier = modifier)
+            {
+                CameraPreview()
+                Text("ABYR")
+                Text("VALG")
+                Text("qwert")
+                Text("zxcv")
+            }
         }
     }
